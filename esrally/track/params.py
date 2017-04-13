@@ -168,6 +168,118 @@ class ActionMetaData(Enum):
     SourceFile = 2
 
 
+class RawBulkIndexParamSource(ParamSource):
+    """
+    EXPERIMENTAL API: This API is only temporarily available in Rally and will be removed soon. Do not rely on it.
+    """
+    def __init__(self, indices, params):
+        super().__init__(indices, params)
+
+        if len(indices) == 1 and len(indices[0].types) == 1:
+            default_index = indices[0].name
+        else:
+            default_index = None
+        self.index_name = params.get("index", default_index)
+
+    def partition(self, partition_index, total_partitions):
+        chosen_indices = [idx for idx in self.indices if idx.matches(self.index_name)]
+        if not chosen_indices:
+            raise exceptions.RallyAssertionError("The provided index [%s] does not match any of the indices [%s]." %
+                                                 (self.index_name, ",".join([str(i) for i in self.indices])))
+
+        logger.info("Choosing indices [%s] for partition [%d] of [%d]." %
+                    (",".join([str(i) for i in chosen_indices]), partition_index, total_partitions))
+        return RawPartitionBulkIndexParamSource(chosen_indices, partition_index, total_partitions)
+
+    def params(self):
+        raise exceptions.RallyError("Do not use a RawBulkIndexParamSource without partitioning")
+
+    def size(self):
+        raise exceptions.RallyError("Do not use a RawBulkIndexParamSource without partitioning")
+
+
+class RawPartitionBulkIndexParamSource(ParamSource):
+    """
+    EXPERIMENTAL API: This API is only temporarily available in Rally and will be removed soon. Do not rely on it.
+    
+    Restrictions: Does only work for a single index and a single type
+    """
+    def __init__(self, indices, partition_index, total_partitions):
+        """
+
+        :param indices: Specification of affected indices.
+        :param partition_index: The current partition index.  Must be in the range [0, `total_partitions`).
+        :param total_partitions: The total number of partitions (i.e. clietns) for bulk index operations.
+        """
+        super().__init__(indices, {})
+
+        import os
+        import os.path
+
+        self.partition_index = partition_index
+        self.total_partitions = total_partitions
+        self.number_of_bulks = 0
+        self.readers = []
+        for index in indices:
+            for type in index.types:
+                # basename / client_id / ...
+                root_dir = os.path.dirname(type.document_file)
+                # the data directories are 1 based, not zero based
+                client_dir = os.path.join(root_dir, str(partition_index + 1))
+                for f in os.listdir(client_dir):
+                    data_file = os.path.join(client_dir, f)
+                    if os.path.isfile(data_file):
+                        self.readers.append(RawIndexDataReader(data_file, index, type))
+                        self.number_of_bulks += 1
+                logger.info("Client [%d] will run [%d] bulks" % (self.partition_index, self.number_of_bulks))
+
+        self.generator = self._create_generator()
+
+    def partition(self, partition_index, total_partitions):
+        raise exceptions.RallyError("Cannot partition a PartitionBulkIndexParamSource further")
+
+    def params(self):
+        return next(self.generator)
+
+    def size(self):
+        return self.number_of_bulks
+
+    def _create_generator(self):
+        bulk_id = 0
+        for reader in self.readers:
+            index, type, docs_in_bulk, bulk = reader()
+            bulk_id += 1
+            params = {
+                "index": index,
+                "type": type,
+                "action_metadata_present": False,
+                "body": bulk,
+                # This is not always equal to the bulk_size we get as parameter. The last bulk may be less than the bulk size.
+                "bulk-size": docs_in_bulk,
+                # a globally unique id for this bulk
+                "bulk-id": "%d-%d" % (self.partition_index, bulk_id)
+            }
+            yield params
+
+
+class RawIndexDataReader:
+    def __init__(self, data_file, index_name, type_name):
+        import os.path
+        import re
+        bn = os.path.basename(data_file)
+        # assumes files are encoded as e.g. <<idx>>_<<bulk_size>>.<<suffix>>, e.g. 1_5000.json
+        self.docs_in_bulk = int(re.findall(".*_(.*)\\.", bn)[0])
+        self.data_file = data_file
+        self.index_name = index_name
+        self.type_name = type_name
+
+    def __call__(self, *args, **kwargs):
+        logger.info("Reading [%s]" % self.data_file)
+        with open(self.data_file, "rb") as f:
+            return self.index_name, self.type_name, self.docs_in_bulk, f.read()
+
+
+
 class BulkIndexParamSource(ParamSource):
     def __init__(self, indices, params):
         super().__init__(indices, params)
@@ -555,3 +667,4 @@ register_param_source_for_operation(track.OperationType.Search, SearchParamSourc
 
 # Also register by name, so users can use it too
 register_param_source_for_name("file-reader", BulkIndexParamSource)
+register_param_source_for_name("raw-file-reader", RawBulkIndexParamSource)

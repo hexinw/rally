@@ -228,11 +228,21 @@ class BulkIndex(Runner):
             raise exceptions.DataError(
                 "Bulk parameter source did not provide a 'bulk-size' parameter. Please add it to your parameter source.")
 
+        body = params["body"]
+        if not isinstance(body, (str, bytes)):
+            body = '\n'.join(body)
+            # bulk body must end with a newline
+            if not body.endswith('\n'):
+                body += '\n'
+
         if with_action_metadata:
             # only half of the lines are documents
-            response = es.bulk(body=params["body"], params=bulk_params)
+            #response = es.bulk(body=params["body"], params=bulk_params)
+            response = es.transport.perform_request("POST", url="/_bulk", params=bulk_params, body=params["body"])
         else:
-            response = es.bulk(body=params["body"], index=params["index"], doc_type=params["type"], params=bulk_params)
+            #response = es.bulk(body=params["body"], index=params["index"], doc_type=params["type"], params=bulk_params)
+            response = es.transport.perform_request("POST", url="/%s/%s/_bulk" % (params["index"], params["type"]), params=bulk_params,
+                                                    body=params["body"])
 
         stats = self.detailed_stats(bulk_size, response) if detailed_results else self.simple_stats(bulk_size, response)
 
@@ -276,7 +286,7 @@ class BulkIndex(Runner):
 
     def simple_stats(self, bulk_size, response):
         bulk_error_count = 0
-        if response["errors"]:
+        if isinstance(response, dict) and response["errors"]:
             for idx, item in enumerate(response["items"]):
                 data = next(iter(item.values()))
                 if data["status"] > 299 or data["_shards"]["failed"] > 0:

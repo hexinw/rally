@@ -217,7 +217,7 @@ class InProcessLauncher:
     def start(self, car, binary, data_paths):
         hosts = self.cfg.opts("client", "hosts")
         client_options = self.cfg.opts("client", "options")
-        es = client.EsClientFactory(hosts, client_options).create()
+        es = client.EsClientFactory(hosts, client_options).create_simple()
 
         # we're very specific which nodes we kill as there is potentially also an Elasticsearch based metrics store running on this machine
         node_prefix = self.cfg.opts("provisioning", "node.name.prefix")
