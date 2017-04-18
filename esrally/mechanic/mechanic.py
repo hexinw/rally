@@ -1,5 +1,8 @@
 import sys
 import logging
+import concurrent.futures
+import threading
+import datetime
 
 import thespian.actors
 
@@ -216,8 +219,11 @@ class NodeMechanicActor(actor.RallyActor):
         console.set_printer(self.print)
         self.config = None
         self.metrics_store = None
+        self.master = None
         self.mechanic = None
         self.single_machine = single_machine
+        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.executor_future = None
 
     def receiveMessage(self, msg, sender):
         # at the moment, we implement all message handling blocking. This is not ideal but simple to get started with. Besides, the caller
@@ -227,6 +233,7 @@ class NodeMechanicActor(actor.RallyActor):
             logger.debug("NodeMechanicActor#receiveMessage(msg = [%s] sender = [%s])" % (str(type(msg)), str(sender)))
             if isinstance(msg, StartEngine):
                 logger.info("Starting engine")
+                self.master = sender
                 # Load node-specific configuration
                 self.config = config.Config(config_name=msg.cfg.name)
                 self.config.load_config()
@@ -245,10 +252,27 @@ class NodeMechanicActor(actor.RallyActor):
 
                 self.mechanic = create(self.config, self.metrics_store, self.single_machine, msg.sources, msg.build, msg.distribution,
                                        msg.external, msg.docker)
-                cluster = self.mechanic.start_engine()
-                self.send(sender, EngineStarted(
-                    ClusterMetaInfo(cluster.hosts, cluster.source_revision, cluster.distribution_version),
-                    self.metrics_store.meta_info))
+                # Potentially long-running blocking call -> use a future
+                self.executor_future = self.pool.submit(self.mechanic.start_engine)
+                self.wakeupAfter(datetime.timedelta(seconds=5))
+            elif isinstance(msg, thespian.actors.WakeupMessage):
+                if self.executor_future is not None:
+                    logger.info("Polling whether cluster has started.")
+                    if self.executor_future.done():
+                        e = self.executor_future.exception(timeout=0)
+                        if e:
+                            logger.info("Cluster failed to start.")
+                            self.send(self.master, Failure("Error while starting engine", e))
+                        else:
+                            cluster = self.executor_future.result(timeout=0)
+                            logger.info("Cluster started successfully. Reporting back to master.")
+                            self.executor_future = None
+                            self.send(self.master, EngineStarted(
+                                ClusterMetaInfo(cluster.hosts, cluster.source_revision, cluster.distribution_version),
+                                self.metrics_store.meta_info))
+                    else:
+                        logger.info("Cluster has not started yet. Scheduling next poll.")
+                        self.wakeupAfter(datetime.timedelta(seconds=5))
             elif isinstance(msg, OnBenchmarkStart):
                 self.metrics_store.lap = msg.lap
                 self.mechanic.on_benchmark_start()

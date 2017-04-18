@@ -66,7 +66,7 @@ class Provisioner:
         logger.info("Preparing candidate locally in [%s]." % self.install_dir)
         io.ensure_dir(self.install_dir)
         if not self.preserve:
-            console.info("Rally will delete the benchmark candidate after the benchmark")
+            console.info("Rally will delete the benchmark candidate after the benchmark", flush=True)
 
         logger.info("Unzipping %s to %s" % (binary, self.install_dir))
         io.decompress(binary, self.install_dir)
