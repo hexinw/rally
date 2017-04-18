@@ -62,6 +62,7 @@ class Benchmark:
         self.external = external
         self.docker = docker
         self.actor_system = None
+        self.console = None
         self.mechanic = None
 
     def _load_track(self):
@@ -78,6 +79,11 @@ class Benchmark:
     def setup(self):
         # at this point an actor system has to run and we should only join
         self.actor_system = actor.bootstrap_actor_system(try_join=True)
+        # we need one global console to print messages to
+        self.console = self.actor_system.createActor(actor.ConsoleActor,
+                                                     targetActorRequirements={"coordinator": True},
+                                                     globalName=actor.ConsoleActor.TARGET_ADDRESS)
+
         self.mechanic = self.actor_system.createActor(mechanic.MechanicActor,
                                                       targetActorRequirements={"coordinator": True},
                                                       globalName="/rally/mechanic/coordinator")

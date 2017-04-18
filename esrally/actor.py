@@ -17,10 +17,13 @@ es_log_level = logging.WARNING
 
 
 class RallyActor(thespian.actors.Actor):
-    def __init__(self):
+    def __init__(self, with_console=True):
         super().__init__()
         # allow to see a thread-dump on SIGQUIT
         faulthandler.register(signal.SIGQUIT, file=sys.stderr)
+        # forward console messages
+        self.with_console = with_console
+        self.console_actor_addr = None
 
     @staticmethod
     def configure_logging(actor_logger):
@@ -28,6 +31,23 @@ class RallyActor(thespian.actors.Actor):
         actor_logger.parent.setLevel(root_log_level)
         # Also ensure that the elasticsearch logger is properly configured
         logging.getLogger("elasticsearch").setLevel(es_log_level)
+
+    def console_actor(self):
+        if self.with_console and self.console_actor_addr is None:
+            # need to initialize lazily as we cannot create new actors in the constructor.
+            self.console_actor_addr = self.createActor(ConsoleActor,
+                                                       targetActorRequirements={"coordinator": True},
+                                                       globalName=ConsoleActor.TARGET_ADDRESS)
+        return self.console_actor_addr
+
+    def print(self, msg, **kwargs):
+        """
+        Prints a text to the "correct" console even when running distributed. Note that this requires that the global ``Console`` actor
+         is available in the current actor system.
+        
+        :param msg: Text to print. 
+        """
+        self.send(self.console_actor(), Print(msg, **kwargs))
 
     # The method name is required by the actor framework
     # noinspection PyPep8Naming
@@ -41,6 +61,24 @@ class RallyActor(thespian.actors.Actor):
                 return False
         logger.info("Capabilities [%s] match requirements [%s]." % (capabilities, requirements))
         return True
+
+
+class Print:
+    def __init__(self, msg, **kwargs):
+        self.msg = msg
+        self.kwargs = kwargs
+
+
+class ConsoleActor(RallyActor):
+    TARGET_ADDRESS = "/rally/console"
+
+    def __init__(self):
+        # don't create a console actor in console actor...
+        super().__init__(with_console=False)
+
+    def receiveMessage(self, msg, sender):
+        if isinstance(msg, Print):
+            console.println(msg.msg, **msg.kwargs)
 
 
 # Defined on top-level to allow pickling

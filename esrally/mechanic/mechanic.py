@@ -90,6 +90,8 @@ class MechanicActor(actor.RallyActor):
     def __init__(self):
         super().__init__()
         actor.RallyActor.configure_logging(logger)
+        # this actor never prints directly to the console
+        console.set_printer(self.print)
         self.mechanics = []
         self.race_control = None
 
@@ -210,6 +212,8 @@ class NodeMechanicActor(actor.RallyActor):
     def __init__(self, single_machine):
         super().__init__()
         actor.RallyActor.configure_logging(logger)
+        # this actor never prints directly to the console
+        console.set_printer(self.print)
         self.config = None
         self.metrics_store = None
         self.mechanic = None

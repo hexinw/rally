@@ -66,6 +66,7 @@ class RichFormat:
 
 
 format = PlainFormat
+printer = print
 
 
 def init(quiet=False):
@@ -78,6 +79,11 @@ def init(quiet=False):
     else:
         PLAIN = False
         format = RichFormat
+
+
+def set_printer(new_printer):
+    global printer
+    printer = new_printer
 
 
 def info(msg, end="\n", flush=False, logger=None, overline=None, underline=None):
@@ -99,16 +105,16 @@ def println(msg, console_prefix=None, end="\n", flush=False, logger=None, overli
     if not QUIET and sys.stdout.isatty():
         complete_msg = "%s %s" % (console_prefix, msg) if console_prefix else msg
         if overline:
-            print(format.underline_for(complete_msg, underline_symbol=overline), flush=flush)
-        print(complete_msg, end=end, flush=flush)
+            printer(format.underline_for(complete_msg, underline_symbol=overline), flush=flush)
+        printer(complete_msg, end=end, flush=flush)
         if underline:
-            print(format.underline_for(complete_msg, underline_symbol=underline), flush=flush)
+            printer(format.underline_for(complete_msg, underline_symbol=underline), flush=flush)
     if logger:
         logger(msg)
 
 
 def progress(width=90):
-    return CmdLineProgressReporter(width, plain_output=PLAIN)
+    return CmdLineProgressReporter(width, printer=printer, plain_output=PLAIN)
 
 
 class CmdLineProgressReporter:
@@ -116,10 +122,11 @@ class CmdLineProgressReporter:
     CmdLineProgressReporter supports displaying an updating progress indication together with an information message.
     """
 
-    def __init__(self, width, plain_output=False):
+    def __init__(self, width, printer=print, plain_output=False):
         self._width = width
         self._first_print = True
         self._plain_output = plain_output
+        self._printer = printer
 
     def print(self, message, progress):
         """
@@ -135,16 +142,16 @@ class CmdLineProgressReporter:
             return
         w = self._width
         if self._first_print:
-            print(" " * w, end="")
+            self._printer(" " * w, end="")
             self._first_print = False
 
         final_message = self._truncate(message, self._width - len(progress))
 
         formatted_progress = progress.rjust(w - len(final_message))
         if self._plain_output:
-            print("\n{0}{1}".format(final_message, formatted_progress), end="")
+            self._printer("\n{0}{1}".format(final_message, formatted_progress), end="")
         else:
-            print("\033[{0}D{1}{2}".format(w, final_message, formatted_progress), end="")
+            self._printer("\033[{0}D{1}{2}".format(w, final_message, formatted_progress), end="")
         sys.stdout.flush()
 
     def _truncate(self, text, max_length, omission="..."):
@@ -157,4 +164,4 @@ class CmdLineProgressReporter:
         if QUIET or not sys.stdout.isatty():
             return
         # print a final statement in order to end the progress line
-        print("")
+        self._printer("")

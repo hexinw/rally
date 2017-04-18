@@ -123,6 +123,8 @@ class Driver(actor.RallyActor):
     def __init__(self):
         super().__init__()
         actor.RallyActor.configure_logging(logger)
+        # this actor never prints directly to the console
+        console.set_printer(self.print)
         self.config = None
         self.track = None
         self.challenge = None
@@ -359,6 +361,8 @@ class LoadGenerator(actor.RallyActor):
     def __init__(self):
         super().__init__()
         actor.RallyActor.configure_logging(logger)
+        # this actor never prints directly to the console
+        console.set_printer(self.print)
         self.master = None
         self.client_id = None
         self.es = None
