@@ -102,7 +102,7 @@ def error(msg, end="\n", flush=False, logger=None, overline=None, underline=None
 
 
 def println(msg, console_prefix=None, end="\n", flush=False, logger=None, overline=None, underline=None):
-    if not QUIET and sys.stdout.isatty():
+    if not QUIET and (sys.stdout.isatty() or printer != print):
         complete_msg = "%s %s" % (console_prefix, msg) if console_prefix else msg
         if overline:
             printer(format.underline_for(complete_msg, underline_symbol=overline), flush=flush)
@@ -138,21 +138,20 @@ class CmdLineProgressReporter:
         :param message: A message to display (will be left-aligned)
         :param progress: A progress indication (will be right-aligned)
         """
-        if QUIET or not sys.stdout.isatty():
+        if QUIET or (not sys.stdout.isatty() and self._printer == print):
             return
         w = self._width
         if self._first_print:
-            self._printer(" " * w, end="")
+            self._printer(" " * w, flush=True, end="")
             self._first_print = False
 
         final_message = self._truncate(message, self._width - len(progress))
 
         formatted_progress = progress.rjust(w - len(final_message))
         if self._plain_output:
-            self._printer("\n{0}{1}".format(final_message, formatted_progress), end="")
+            self._printer("\n{0}{1}".format(final_message, formatted_progress), flush=True, end="")
         else:
-            self._printer("\033[{0}D{1}{2}".format(w, final_message, formatted_progress), end="")
-        sys.stdout.flush()
+            self._printer("\033[{0}D{1}{2}".format(w, final_message, formatted_progress), flush=True, end="")
 
     def _truncate(self, text, max_length, omission="..."):
         if len(text) <= max_length:
@@ -164,4 +163,4 @@ class CmdLineProgressReporter:
         if QUIET or not sys.stdout.isatty():
             return
         # print a final statement in order to end the progress line
-        self._printer("")
+        self._printer("", flush=True)
