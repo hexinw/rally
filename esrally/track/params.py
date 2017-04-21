@@ -661,10 +661,10 @@ class IndexDataReader:
         self.file_source.close()
         return False
 
-
-register_param_source_for_operation(track.OperationType.Index, BulkIndexParamSource)
+# Use RawBulkIndexParamSource as default everywhere
+register_param_source_for_operation(track.OperationType.Index, RawBulkIndexParamSource)
 register_param_source_for_operation(track.OperationType.Search, SearchParamSource)
 
 # Also register by name, so users can use it too
-register_param_source_for_name("file-reader", BulkIndexParamSource)
-register_param_source_for_name("raw-file-reader", RawBulkIndexParamSource)
+register_param_source_for_name("file-reader", RawBulkIndexParamSource)
+register_param_source_for_name("json-file-reader", BulkIndexParamSource)
