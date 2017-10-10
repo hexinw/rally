@@ -230,6 +230,7 @@ class MechanicActor(actor.RallyActor):
         try:
             logger.info("MechanicActor#receiveMessage(msg = [%s] sender = [%s])" % (str(type(msg)), str(sender)))
             if isinstance(msg, StartEngine):
+                self.wakeupAfter(30, payload="health_check")
                 self.on_start_engine(msg, sender)
             elif isinstance(msg, NodesStarted):
                 self.metrics_store.merge_meta_info(msg.system_meta_info)
@@ -250,7 +251,12 @@ class MechanicActor(actor.RallyActor):
                 else:
                     self.reset_relative_time()
             elif isinstance(msg, thespian.actors.WakeupMessage):
-                self.reset_relative_time()
+                if msg.payload is None:
+                    self.reset_relative_time()
+                elif msg.payload == "health_check":
+                    logger.info("Mechanic health check: Current status = [%s]. children = %s, received responses = %s" %
+                                (self.status, self.children, self.received_responses))
+                    self.wakeupAfter(30, payload="health_check")
             elif isinstance(msg, actor.BenchmarkFailure):
                 self.send(self.race_control, msg)
             elif isinstance(msg, OnBenchmarkStop):
