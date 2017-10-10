@@ -171,8 +171,8 @@ class BenchmarkActor(actor.RallyActor):
 
     def setup(self, msg):
         self.mechanic = self.createActor(mechanic.MechanicActor,
-                                         #globalName="/rally/mechanic/coordinator",
-                                         targetActorRequirements={"coordinator": True})
+                                         targetActorRequirements={"coordinator": True},
+                                         globalName="/rally/mechanic/coordinator")
 
         self.cfg = msg.cfg
         # to load the track we need to know the correct cluster distribution version. Usually, this value should be set but there are rare
@@ -215,8 +215,8 @@ class BenchmarkActor(actor.RallyActor):
         logger.info("Telling mechanic of benchmark start.")
         self.send(self.mechanic, mechanic.OnBenchmarkStart(lap))
         self.main_driver = self.createActor(driver.DriverActor,
-                                            #globalName="/rally/driver/coordinator",
-                                            targetActorRequirements={"coordinator": True})
+                                            targetActorRequirements={"coordinator": True},
+                                            globalName="/rally/driver/coordinator")
         logger.info("Telling driver to start benchmark.")
         self.send(self.main_driver, driver.StartBenchmark(self.cfg, self.race.track, self.metrics_store.meta_info, lap))
 
