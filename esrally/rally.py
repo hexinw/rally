@@ -627,8 +627,8 @@ def main():
     except BaseException:
         logger.exception("Could not terminate potentially running Rally instances correctly. Attempting to go on anyway.")
 
-    logger.info("Start sleeping for a bit more than five minutes to give timeout handlers in thespian a chance to run.")
-    time.sleep(5 * 65)
+    logger.info("Start sleeping for a bit more than fifteen minutes to give timeout handlers in thespian a chance to run.")
+    time.sleep(15 * 65)
     logger.info("Done sleeping.")
 
     success = dispatch_sub_command(cfg, sub_command)
