@@ -50,7 +50,7 @@ def configure_logging(cfg):
     else:
         ch = logging.StreamHandler(stream=sys.stdout)
 
-    log_level = logging.INFO
+    log_level = logging.DEBUG
     ch.setLevel(log_level)
     formatter = logging.Formatter("%(asctime)s,%(msecs)d PID:%(process)d %(name)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     formatter.converter = time.gmtime
@@ -61,7 +61,7 @@ def configure_logging(cfg):
         logging.root.removeHandler(handler)
 
     logging.root.addHandler(ch)
-    logging.getLogger("elasticsearch").setLevel(logging.WARNING)
+    logging.getLogger("elasticsearch").setLevel(logging.DEBUG)
 
     if profiling_enabled:
         profile_file = "%s/profile.log" % application_log_dir_path()

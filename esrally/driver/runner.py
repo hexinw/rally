@@ -252,6 +252,11 @@ class BulkIndex(Runner):
             raise exceptions.DataError(
                 "Bulk parameter source did not provide a 'bulk-size' parameter. Please add it to your parameter source.")
 
+        # Hack. Add routing here.
+        # logger.warning("Params body %s", params["body"][0]["index"]["_routing"])
+
+        # if "index" in params["body"][0] and "_routing" in params["body"][0]["index"]:
+        #    bulk_params["routing"] = params["body"][0]["index"]["_routing"]
         if with_action_metadata:
             # only half of the lines are documents
             response = es.bulk(body=params["body"], params=bulk_params)

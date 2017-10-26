@@ -786,6 +786,8 @@ def setup_template(es, template, settings):
 
 
 def setup_index(es, index, index_settings):
+    # Hack to use external index.
+    # if False and index.auto_managed:
     if index.auto_managed:
         if es.indices.exists(index=index.name):
             logger.warning("Index [%s] already exists. Deleting it." % index.name)
